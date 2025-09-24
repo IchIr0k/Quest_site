@@ -1,0 +1,893 @@
+Принимай код интерфейса и запоминай:
+static/app.js:
+document.addEventListener("DOMContentLoaded", function() {
+  // Load more
+  const loadBtn = document.getElementById("load-more");
+  if (loadBtn) {
+    loadBtn.addEventListener("click", async () => {
+      const btn = loadBtn;
+      const skip = parseInt(btn.dataset.skip || "0");
+      const params = new URLSearchParams(window.location.search);
+      params.set("skip", skip);
+
+      const url = "/api/quests?" + params.toString();
+      btn.disabled = true;
+      btn.textContent = "Загрузка...";
+
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const html = await res.text();
+
+          // Найдем новую сетку карточек во фрагменте
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = html;
+          const newGrid = tempDiv.querySelector('.cards-grid');
+
+          const cardsGrid = document.querySelector(".cards-grid");
+          if (newGrid && cardsGrid) {
+            // вставляем карточки
+            cardsGrid.insertAdjacentHTML('beforeend', newGrid.innerHTML);
+
+            const addedCount = newGrid.querySelectorAll('.card').length;
+            const newSkip = skip + addedCount;
+            btn.dataset.skip = newSkip;
+            btn.textContent = "Посмотреть ещё";
+            btn.disabled = false;
+
+            // если добавлено меньше, чем лимит — скрываем кнопку
+            if (addedCount === 0 || addedCount < 6) {
+              btn.style.display = 'none';
+            }
+          } else {
+            btn.textContent = "Нет данных";
+            btn.disabled = true;
+          }
+        } else {
+          btn.textContent = "Ошибка загрузки";
+          btn.disabled = false;
+        }
+      } catch (error) {
+        btn.textContent = "Ошибка";
+        btn.disabled = false;
+        console.error('Load more error:', error);
+      }
+    });
+  }
+
+  // filters
+  const applyFilters = document.getElementById("apply-filters");
+  if (applyFilters) {
+    applyFilters.addEventListener("click", () => {
+      const form = document.getElementById("filter-form");
+      const data = new FormData(form);
+      const params = new URLSearchParams();
+      for (const [k,v] of data.entries()) {
+        if (v) params.set(k, v);
+      }
+      window.location = "/?" + params.toString();
+    });
+  }
+
+  // booking timeslot selection and AJAX booking
+  const bookingForm = document.getElementById("booking-form");
+  if (bookingForm) {
+    const slotButtons = bookingForm.querySelectorAll(".slot");
+    const timeslotInput = document.getElementById("timeslot-input");
+    slotButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        slotButtons.forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        timeslotInput.value = btn.textContent.trim();
+      });
+    });
+
+    bookingForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(bookingForm);
+      const res = await fetch("/book", { method: "POST", body: fd });
+      const resultDiv = document.getElementById("booking-result");
+      if (!resultDiv) return;
+      if (res.ok) {
+        const data = await res.json();
+        resultDiv.textContent = data.message;
+        resultDiv.style.color = "lightgreen";
+      } else {
+        let data;
+        try { data = await res.json(); } catch(_) { data = {}; }
+        resultDiv.textContent = data.message || "Ошибка бронирования";
+        resultDiv.style.color = "lightpink";
+      }
+    });
+  }
+});
+
+static/styles.css:
+:root{
+  --bg:#0b1233;
+  --panel:#121631;
+  --muted:#9aa0c6;
+  --accent:#444af7;
+  --card:#0f183d;
+  --btn:#4650f5;
+}
+
+body{font-family:Inter, system-ui, Arial, sans-serif; background:var(--bg); color:#e6e9fb; margin:0; padding:0;}
+.topbar{display:flex;align-items:center;gap:18px;padding:16px 32px;background:linear-gradient(180deg,#0a0f2b,#0b1233);}
+.topbar .logo{font-weight:700;}
+.topbar nav a{color:var(--muted); margin-right:12px; text-decoration:none;}
+.topbar .search{margin-left:auto;}
+.topbar input{background:#0c1330;border:1px solid #1b2244;padding:8px 10px;border-radius:12px;color:#dfe6ff;}
+.container{padding:24px 48px;}
+.layout{display:flex;gap:24px;}
+.filters{width:240px;background:var(--panel);padding:16px;border-radius:12px;}
+.main-col{flex:1;padding:8px;}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
+.card{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.card img{width:100%;height:140px;object-fit:cover;border-radius:8px;background:#0b122e}
+.card-placeholder{height:140px;background:#0b122e;border-radius:8px;}
+.card h4{margin:10px 0 4px;}
+.card .meta{font-size:13px;color:var(--muted);}
+.card .desc{font-size:14px;color:#d2d6f7;height:42px;overflow:hidden}
+.card .card-actions{margin-top:10px;display:flex;gap:8px;}
+.btn{background:var(--btn);padding:8px 12px;border-radius:10px;color:white;text-decoration:none;border:none;cursor:pointer;}
+.btn.outline{background:transparent;border:1px solid #39417b;color:#dfe6ff;}
+.btn.danger{background:#b33a3a;}
+.footer{padding:18px 48px;color:var(--muted);}
+
+.load-more-wrap{display:flex;justify-content:center;margin-top:18px;}
+.detail{display:flex;gap:24px;}
+.detail-image{width:420px;border-radius:12px;}
+.detail-placeholder{width:420px;height:280px;background:#0b122e;border-radius:12px;}
+.admin-list{display:flex;flex-direction:column;gap:12px;}
+.admin-item{display:flex;gap:12px;align-items:center;background:var(--panel);padding:10px;border-radius:8px;}
+.thumb img{width:100px;height:70px;object-fit:cover;border-radius:6px}
+.admin-form input, .admin-form textarea, .auth-form input{width:100%;padding:8px;border-radius:8px;border:1px solid #1b2244;background:#0b1330;color:#e6e9fb;margin-top:6px;margin-bottom:12px}
+.alert{background:#3b2432;padding:10px;border-radius:8px;color:#ffc6c6;margin-bottom:8px}
+
+templates/_quest_cards.html:
+<div class="cards-grid">
+  {% for q in quests %}
+    <div class="card">
+      {% if q.image_path %}
+        <img src="/static/{{ q.image_path }}" alt="{{ q.title }}">
+      {% else %}
+        <div class="card-placeholder"></div>
+      {% endif %}
+      <h4>{{ q.title }}</h4>
+      <p class="meta">{{ q.genre }} • {{ q.difficulty }} • {{ q.players }} чел.</p>
+      <p class="desc">{{ q.description[:120] }}{% if q.description|length > 120 %}...{% endif %}</p>
+      <div class="card-actions">
+        <a class="btn" href="/quest/{{ q.id }}">Просмотр</a>
+        {% if user and user.is_admin %}
+          <a class="btn outline" href="/admin/edit/{{ q.id }}">Редактировать</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- templates/add_quest.html -->
+{% extends "base.html" %}
+{% block title %}Добавить квест{% endblock %}
+{% block content %}
+<h2>Добавить квест</h2>
+<form action="/admin/add" method="post" enctype="multipart/form-data" class="admin-form">
+  <label>Название<br><input name="title" required></label>
+  <label>Описание<br><textarea name="description"></textarea></label>
+  <label>Жанр<br><input name="genre"></label>
+  <label>Сложность<br><input name="difficulty"></label>
+  <label>Уровень страха (1-5)<br><input type="number" name="fear_level" min="0" max="5" value="0"></label>
+  <label>Количество игроков<br><input type="number" name="players" min="1" value="1"></label>
+  <label>Изображение<br><input type="file" name="image"></label>
+  <button class="btn">Добавить</button>
+</form>
+{% endblock %}
+
+<!-- templates/admin_dashboard.html -->
+{% extends "base.html" %}
+{% block title %}Панель администратора{% endblock %}
+{% block content %}
+<h2>Панель администратора</h2>
+<p><a href="/admin/add" class="btn">Добавить квест</a></p>
+<div class="admin-list">
+  {% for q in quests %}
+    <div class="admin-item">
+      <div class="thumb">
+        {% if q.image %}
+          <img src="/static/{{ q.image }}" alt="{{ q.title }}">
+        {% else %}
+          <div class="card-placeholder small"></div>
+        {% endif %}
+      </div>
+      <div class="info">
+        <h4>{{ q.title }}</h4>
+        <div class="actions">
+          <a class="btn" href="/quest/{{ q.id }}">Просмотр</a>
+          <a class="btn outline" href="/admin/edit/{{ q.id }}">Редактировать</a>
+          <form style="display:inline" method="post" action="/admin/delete/{{ q.id }}">
+            <button class="btn danger" type="submit">Удалить</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{% block title %}Квесты{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">Логотип</div>
+    <nav>
+      <a href="/">Все квесты</a>
+      <a href="/?">Расписание квестов</a>
+    </nav>
+    <div class="search">
+      <form id="search-form" action="/" method="get">
+        <input name="q" placeholder="Поиск..." value="{{ request.query_params.get('q','') }}">
+        <button type="submit">🔍</button>
+      </form>
+    </div>
+    <div class="user-nav">
+      {% if user %}
+        <span>Привет, {{ user.username }}</span>
+        {% if user.is_admin %}
+          <span class="admin-badge">Администратор</span>
+        {% endif %}
+        <a href="/logout">Выйти</a>
+      {% else %}
+        <a href="/login">Войти</a>
+        <a href="/register">Регистрация</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <small>© Квесты — демо</small>
+  </footer>
+</body>
+</html>
+
+<!-- templates/edit_quest.html -->
+{% extends "base.html" %}
+{% block title %}Редактировать{% endblock %}
+{% block content %}
+<h2>Редактировать квест</h2>
+<form action="/admin/edit/{{ quest.id }}" method="post" enctype="multipart/form-data" class="admin-form">
+  <label>Название<br><input name="title" value="{{ quest.title }}" required></label>
+  <label>Описание<br><textarea name="description">{{ quest.description }}</textarea></label>
+  <label>Жанр<br><input name="genre" value="{{ quest.genre }}"></label>
+  <label>Сложность<br><input name="difficulty" value="{{ quest.difficulty }}"></label>
+  <label>Уровень страха<br><input type="number" name="fear_level" min="0" max="5" value="{{ quest.fear_level }}"></label>
+  <label>Количество игроков<br><input type="number" name="players" min="1" value="{{ quest.players }}"></label>
+  <label>Изображение (загрузите новое, чтобы заменить)<br><input type="file" name="image"></label>
+  <button class="btn">Сохранить</button>
+</form>
+{% endblock %}
+
+templates/quest_detail.html:
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+
+  <!-- Фильтры -->
+  <aside class="filters">
+    <form id="filter-form">
+
+      <h3>Жанры</h3>
+      <label><input type="checkbox" name="genre" value="детям"> Детям</label><br>
+      <label><input type="checkbox" name="genre" value="страшные"> Страшные</label><br>
+      <label><input type="checkbox" name="genre" value="веселые"> Весёлые</label><br>
+      <label><input type="checkbox" name="genre" value="с актерами"> С актёрами</label><br>
+      <label><input type="checkbox" name="genre" value="без актеров"> Без актёров</label><br>
+      <label><input type="checkbox" name="genre" value="нестрашные"> Нестрашные</label><br>
+      <label><input type="checkbox" name="genre" value="загадки"> Загадки</label><br>
+
+      <h3>Сложность</h3>
+      <label><input type="checkbox" name="difficulty" value="легкий"> Лёгкий</label><br>
+      <label><input type="checkbox" name="difficulty" value="нормальный"> Нормальный</label><br>
+      <label><input type="checkbox" name="difficulty" value="сложный"> Сложный</label><br>
+      <label><input type="checkbox" name="difficulty" value="экстремальный"> Экстремальный</label><br>
+
+      <h3>Уровень страха</h3>
+      <div id="fear-level">
+        <span data-value="1">★</span>
+        <span data-value="2">★</span>
+        <span data-value="3">★</span>
+        <span data-value="4">★</span>
+        <span data-value="5">★</span>
+      </div>
+      <input type="hidden" name="fear_level" id="fear_input">
+
+      <h3>Количество игроков</h3>
+      <div id="players">
+        <span data-value="1">⚪</span>
+        <span data-value="2">⚪</span>
+        <span data-value="3">⚪</span>
+        <span data-value="4">⚪</span>
+        <span data-value="5">⚪</span>
+      </div>
+      <input type="hidden" name="players" id="players_input">
+
+      <button type="submit">Применить</button>
+    </form>
+  </aside>
+
+  <!-- Список квестов -->
+  <main class="quests" id="quests-container">
+    {% include "_quest_cards.html" %}
+  </main>
+
+</div>
+
+<script>
+  // --- Уровень страха ---
+  document.querySelectorAll("#fear-level span").forEach(star => {
+    star.addEventListener("click", () => {
+      let value = star.getAttribute("data-value");
+      document.getElementById("fear_input").value = value;
+      document.querySelectorAll("#fear-level span").forEach(s => {
+        s.style.color = s.getAttribute("data-value") <= value ? "gold" : "gray";
+      });
+    });
+  });
+
+  // --- Количество игроков ---
+  document.querySelectorAll("#players span").forEach(circle => {
+    circle.addEventListener("click", () => {
+      let value = circle.getAttribute("data-value");
+      document.getElementById("players_input").value = value;
+      document.querySelectorAll("#players span").forEach(c => {
+        c.style.color = c.getAttribute("data-value") <= value ? "green" : "gray";
+      });
+    });
+  });
+
+  // --- AJAX загрузка квестов ---
+  document.getElementById("filter-form").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const params = new URLSearchParams(formData);
+
+    fetch("/api/quests?" + params.toString())
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById("quests-container").innerHTML = html;
+      });
+  });
+</script>
+{% endblock %}
+
+<!-- templates/login.html -->
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<h2>Авторизация</h2>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+<form method="post" class="auth-form">
+  <label>Логин<br><input name="username" required></label>
+  <label>Пароль<br><input type="password" name="password" required></label>
+  <button class="btn">Войти</button>
+</form>
+<p>Нет аккаунта? <a href="/register">Зарегистрироваться</a></p>
+{% endblock %}
+
+{% extends "base.html" %}
+{% block title %}{{ quest.title }}{% endblock %}
+{% block content %}
+<div class="detail">
+    <div class="detail-left">
+        {% if quest.image_path %}
+        <img src="/static/{{ quest.image_path }}" alt="{{ quest.title }}" class="detail-image">
+        {% else %}
+        <div class="detail-placeholder"></div>
+        {% endif %}
+    </div>
+    <div class="detail-right">
+        <h1>{{ quest.title }}</h1>
+        <p class="meta">{{ quest.genre }} • {{ quest.difficulty }} • Уровень страха: {{ quest.fear_level }}</p>
+        <p>{{ quest.description }}</p>
+        <p>Количество игроков: {{ quest.players }}</p>
+
+        <hr>
+        <h3>Бронирование</h3>
+        {% if user %}
+        <form id="booking-form">
+            <input type="hidden" name="quest_id" value="{{ quest.id }}">
+            <label>Выберите дату: <input type="date" name="date" required></label>
+            <div class="timeslots">
+                <button type="button" class="slot">10:00</button>
+                <button type="button" class="slot">12:00</button>
+                <button type="button" class="slot">14:00</button>
+                <button type="button" class="slot">16:00</button>
+            </div>
+            <input type="hidden" name="timeslot" id="timeslot-input" value="">
+            <button id="book-btn" class="btn" type="submit">Забронировать</button>
+        </form>
+        <div id="booking-result"></div>
+        {% else %}
+        <p>Чтобы забронировать, <a href="/login">войдите</a> или <a href="/register">зарегистрируйтесь</a>.</p>
+        {% endif %}
+    </div>
+    <style>
+        .slot {
+            background: var(--panel);
+            border: 1px solid #39417b;
+            color: #dfe6ff;
+            padding: 8px 12px;
+            margin: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .slot.selected {
+            background: var(--btn);
+            border-color: var(--btn);
+        }
+    </style>
+</div>
+{% endblock %}
+
+<!-- templates/register.html -->
+{% extends "base.html" %}
+{% block title %}Регистрация{% endblock %}
+{% block content %}
+<h2>Регистрация</h2>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+<form method="post" class="auth-form">
+  <label>Логин<br><input name="username" required></label>
+  <label>Email (необязательно)<br><input name="email" type="email"></label>
+  <label>Пароль<br><input type="password" name="password" required></label>
+  <button class="btn">Зарегистрироваться</button>
+</form>
+<p>Уже есть аккаунт? <a href="/login">Войти</a></p>
+{% endblock %}
+
+# auth.py
+from fastapi import Request, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+
+from database import SessionLocal
+import models  # импортируем модели напрямую
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# --- DB Session ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# --- Password utils ---
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+
+# --- Current user ---
+def get_current_user(request: Request, db: Session = Depends(get_db)):
+    """Возвращает текущего пользователя по session['user_id']"""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    user = db.get(models.User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
+
+
+def require_admin(user=Depends(get_current_user)):
+    """Проверка, что пользователь администратор"""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    return user
+
+# crud.py
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+import models, schemas
+
+def get_quests(db: Session, skip: int = 0, limit: int = 6, filters: dict = None):
+    query = db.query(models.Quest)
+
+    if filters:
+        # Поиск по тексту
+        if filters.get("q"):
+            q = f"%{filters['q']}%"
+            query = query.filter(models.Quest.title.ilike(q))
+
+        # Жанры (могут быть несколько)
+        if filters.get("genre"):
+            query = query.filter(models.Quest.genre.in_(filters["genre"]))
+
+        # Сложность (тоже список)
+        if filters.get("difficulty"):
+            query = query.filter(models.Quest.difficulty.in_(filters["difficulty"]))
+
+        # Уровень страха (например, >= выбранного)
+        if filters.get("fear_level"):
+            query = query.filter(models.Quest.fear_level >= int(filters["fear_level"]))
+
+        # Количество игроков (например, <= выбранного)
+        if filters.get("players"):
+            query = query.filter(models.Quest.players >= int(filters["players"]))
+
+    return query.offset(skip).limit(limit).all()
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# Данные для подключения (настрой их под свою БД)
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "1234"        # укажи реальный пароль
+POSTGRES_DB = "Quest_site"
+POSTGRES_HOST = "localhost"
+POSTGRES_PORT = "5432"
+
+SQLALCHEMY_DATABASE_URL = (
+    f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+)
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+# main.py
+import os
+import shutil
+import uuid
+from typing import Optional
+
+from fastapi import (
+    FastAPI, Request, Form, UploadFile, File, Depends, HTTPException
+)
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy.orm import Session
+
+from database import engine, Base, SessionLocal
+import models
+import crud
+from auth import hash_password, verify_password, get_db, get_current_user, require_admin
+from schemas import QuestCreate
+import uvicorn
+
+# --- Подготовка директорий ---
+os.makedirs("static/uploads", exist_ok=True)
+
+app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="!secret_dev_change_me!")  # секрет поменять в продакшене
+
+# --- Статика и шаблоны ---
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# --- Создание таблиц ---
+Base.metadata.create_all(bind=engine)
+
+
+# --- Создание дефолтного админа ---
+def create_default_admin():
+    db = SessionLocal()
+    try:
+        admin = db.query(models.User).filter_by(username="admin").first()
+        if not admin:
+            a = models.User(
+                username="admin",
+                email="admin@example.com",
+                hashed_password=hash_password("admin"),
+                is_admin=True
+            )
+            db.add(a)
+            db.commit()
+            print("✅ Created default admin (username=admin password=admin). Change password immediately.")
+    finally:
+        db.close()
+
+
+create_default_admin()
+
+
+# --- Хелперы ---
+def save_upload(file: UploadFile) -> str:
+    """Сохраняет файл в static/uploads и возвращает относительный путь"""
+    ext = os.path.splitext(file.filename)[1]
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    dest = os.path.join("static", "uploads", safe_name)
+    with open(dest, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return f"uploads/{safe_name}"
+
+
+# --- Маршруты ---
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request, q: Optional[str] = None, genre: Optional[str] = None,
+          difficulty: Optional[str] = None, skip: int = 0, db: Session = Depends(get_db)):
+    filters = {}
+    if q:
+        filters["q"] = q
+    if genre:
+        filters["genre"] = genre
+    if difficulty:
+        filters["difficulty"] = difficulty
+    quests = crud.get_quests(db, skip=skip, limit=6, filters=filters)
+    try:
+        user = get_current_user(request, db)
+    except:
+        user = None
+    return templates.TemplateResponse("index.html", {"request": request, "quests": quests, "user": user, "skip": skip})
+
+
+@app.get("/api/quests", response_class=HTMLResponse)
+def api_quests(request: Request, q: Optional[str] = None, genre: Optional[str] = None,
+               difficulty: Optional[str] = None, skip: int = 0, limit: int = 6, db: Session = Depends(get_db)):
+    filters = {}
+    if q:
+        filters["q"] = q
+    if genre:
+        filters["genre"] = genre
+    if difficulty:
+        filters["difficulty"] = difficulty
+    quests = crud.get_quests(db, skip=skip, limit=limit, filters=filters)
+    return templates.TemplateResponse("_quest_cards.html", {"request": request, "quests": quests})
+
+
+@app.get("/quest/{quest_id}", response_class=HTMLResponse)
+def quest_detail(request: Request, quest_id: int, db: Session = Depends(get_db)):
+    quest = crud.get_quest(db, quest_id)
+    if not quest:
+        raise HTTPException(status_code=404, detail="Quest not found")
+    try:
+        user = get_current_user(request, db)
+    except:
+        user = None
+    return templates.TemplateResponse("quest_detail.html", {"request": request, "quest": quest, "user": user})
+
+
+@app.post("/book")
+def book(request: Request, quest_id: int = Form(...), date: str = Form(...), timeslot: str = Form(...),
+         db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    booking = crud.create_booking(db, user_id=user.id, quest_id=quest_id, date=date, timeslot=timeslot)
+    if not booking:
+        return JSONResponse({"success": False, "message": "Выбранный слот уже занят"}, status_code=400)
+    return JSONResponse({"success": True, "message": "Бронь успешно создана"})
+
+
+# --- Auth routes ---
+@app.get("/login", response_class=HTMLResponse)
+def login_get(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.post("/login")
+def login_post(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter_by(username=username).first()
+    if not user or not verify_password(password, user.hashed_password):
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Неверные учётные данные"})
+    request.session["user_id"] = user.id
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_get(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
+
+@app.post("/register")
+def register_post(request: Request, username: str = Form(...), email: str = Form(None), password: str = Form(...),
+                  db: Session = Depends(get_db)):
+    existing = db.query(models.User).filter_by(username=username).first()
+    if existing:
+        return templates.TemplateResponse("register.html", {"request": request, "error": "Пользователь уже существует"})
+    u = models.User(
+        username=username,
+        email=email,
+        hashed_password=hash_password(password),
+        is_admin=False
+    )
+    db.add(u)
+    db.commit()
+    request.session["user_id"] = u.id
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=303)
+
+
+# --- Admin routes ---
+@app.get("/admin", response_class=HTMLResponse)
+def admin_dashboard(request: Request, db: Session = Depends(get_db), user=Depends(require_admin)):
+    quests = crud.get_quests(db, skip=0, limit=1000, filters={})
+    return templates.TemplateResponse("admin_dashboard.html", {"request": request, "quests": quests, "user": user})
+
+
+@app.get("/admin/add", response_class=HTMLResponse)
+def add_get(request: Request, user=Depends(require_admin)):
+    return templates.TemplateResponse("add_quest.html", {"request": request, "user": user})
+
+
+@app.post("/admin/add")
+def add_post(request: Request,
+             title: str = Form(...),
+             description: str = Form(""),
+             genre: str = Form(""),
+             difficulty: str = Form(""),
+             fear_level: int = Form(0),
+             players: int = Form(1),
+             image: Optional[UploadFile] = File(None),
+             db: Session = Depends(get_db),
+             user=Depends(require_admin)):
+    image_path = save_upload(image) if image else None
+    quest_in = QuestCreate(
+        title=title,
+        description=description,
+        genre=genre,
+        difficulty=difficulty,
+        fear_level=fear_level,
+        players=players
+    )
+    crud.create_quest(db, quest_in, image_path=image_path)
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.get("/admin/edit/{quest_id}", response_class=HTMLResponse)
+def edit_get(request: Request, quest_id: int, db: Session = Depends(get_db), user=Depends(require_admin)):
+    quest = crud.get_quest(db, quest_id)
+    if not quest:
+        raise HTTPException(404, "Квест не найден")
+    return templates.TemplateResponse("edit_quest.html", {"request": request, "quest": quest, "user": user})
+
+
+@app.post("/admin/edit/{quest_id}")
+def edit_post(request: Request, quest_id: int,
+              title: str = Form(...),
+              description: str = Form(""),
+              genre: str = Form(""),
+              difficulty: str = Form(""),
+              fear_level: int = Form(0),
+              players: int = Form(1),
+              image: Optional[UploadFile] = File(None),
+              db: Session = Depends(get_db),
+              user=Depends(require_admin)):
+    data = {"title": title, "description": description, "genre": genre, "difficulty": difficulty,
+            "fear_level": fear_level, "players": players}
+    if image:
+        data["image_path"] = save_upload(image)
+    crud.update_quest(db, quest_id, data)
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.post("/admin/delete/{quest_id}")
+def admin_delete(quest_id: int, db: Session = Depends(get_db), user=Depends(require_admin)):
+    q = crud.get_quest(db, quest_id)
+    if q and q.image_path:
+        file_path = os.path.join("static", q.image_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    crud.delete_quest(db, quest_id)
+    return RedirectResponse("/admin", status_code=303)
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="127.0.0.1",
+        port=5000,
+        reload=True
+    )
+
+from sqlalchemy import Column, Integer, String, Boolean, Text, ForeignKey
+from sqlalchemy.orm import relationship
+from database import Base
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False)
+    email = Column(String(120), unique=True, nullable=True)  # nullable True, т.к. email необяз.
+    hashed_password = Column(String(255), nullable=False)
+    is_admin = Column(Boolean, default=False)
+
+    bookings = relationship("Booking", back_populates="user")
+
+
+class Quest(Base):
+    __tablename__ = "quests"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(150), nullable=False)
+    description = Column(Text, nullable=False)
+    genre = Column(String(50), nullable=False)
+    difficulty = Column(String(30), nullable=False)
+    fear_level = Column(Integer, nullable=False)
+    players = Column(Integer, nullable=False)
+    image_path = Column(String(255), nullable=True)  # unified name
+
+    bookings = relationship("Booking", back_populates="quest")
+
+
+class Booking(Base):
+    __tablename__ = "bookings"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    quest_id = Column(Integer, ForeignKey("quests.id"))
+    date_time = Column(String(50))  # stores "YYYY-MM-DD HH:MM" style string
+
+    user = relationship("User", back_populates="bookings")
+    quest = relationship("Quest", back_populates="bookings")
+
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
+
+class UserCreate(BaseModel):
+    username: str
+    email: Optional[str] = None
+    password: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    email: Optional[str]
+    is_admin: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class QuestBase(BaseModel):
+    title: str
+    description: str
+    genre: str
+    difficulty: str
+    fear_level: int
+    players: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class QuestCreate(QuestBase):
+    pass
+
+class QuestOut(QuestBase):
+    id: int
+    image_path: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class BookingCreate(BaseModel):
+    quest_id: int
+    date: str
+    timeslot: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+я пишу код для макета, что представлен выше, реализуй кнопки(визуально, а то их нет) добавления, редактирования и удаления квестов(форма добавления находится на странице, где написано "добавить квест"). эти кнопки у меня находятся напротив фильтра, там они подписаны, все квесты должны быть ниже этих кнопок, а над кнопками должно быть название "Каталог квестов"
+так же сделай чекбоксы звезд немного крупнее и пусть чекбосы кружочков работают(в форме добавления квеста пишется максимальное количество человек, когда выбираешь 4 кружочка в фильтре, должен выйти квест, который соответствует параметрам выше и при этом имеет до 4 человек, может быть менбше, но не может быть бальше)
